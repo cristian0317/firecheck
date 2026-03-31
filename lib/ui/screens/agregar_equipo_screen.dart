@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import '../../models/extintor_model.dart';
+import '../../services/pdf_service.dart';
+import 'qr_preview_screen.dart'; // IMPORTANTE
 
 class AgregarEquipoScreen extends StatefulWidget {
   const AgregarEquipoScreen({super.key});
@@ -24,25 +28,48 @@ class _AgregarEquipoScreenState extends State<AgregarEquipoScreen> {
   Future<void> _guardarEquipo() async {
     if (!_formKey.currentState!.validate()) return;
 
+    // Verificar autenticación antes de proceder
+    var user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      await Future.delayed(const Duration(milliseconds: 500));
+      user = FirebaseAuth.instance.currentUser;
+    }
+
+    if (user == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Error: Sesión no válida. Por favor, re-ingrese.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
     setState(() => _isSaving = true);
 
     try {
       final String id = _idController.text.trim();
+      final String ubicacion = _ubicacionController.text.trim();
+      final String capacidad = _capacidadController.text.trim();
       
       await FirebaseFirestore.instance.collection('extintores').doc(id).set({
         'id': id,
-        'ubicacion': _ubicacionController.text.trim(),
-        'capacidad': _capacidadController.text.trim(),
+        'ubicacion': ubicacion,
+        'capacidad': capacidad,
         'tipo': _tipoSeleccionado,
         'estado': _estadoSeleccionado,
         'fecha_registro': FieldValue.serverTimestamp(),
       });
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Extintor registrado con éxito'), backgroundColor: Colors.green),
+        final nuevoExtintor = Extintor(
+          id: id,
+          ubicacion: ubicacion,
+          capacidad: capacidad,
+          tipo: _tipoSeleccionado,
+          estado: _estadoSeleccionado,
         );
-        Navigator.pop(context);
+
+        _mostrarDialogoExito(nuevoExtintor);
       }
     } catch (e) {
       setState(() => _isSaving = false);
@@ -52,6 +79,62 @@ class _AgregarEquipoScreenState extends State<AgregarEquipoScreen> {
         );
       }
     }
+  }
+
+  void _mostrarDialogoExito(Extintor extintor) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Column(
+          children: [
+            Icon(Icons.check_circle, color: Colors.green, size: 64),
+            SizedBox(height: 16),
+            Text('¡Éxito!', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('El extintor ${extintor.id} ha sido registrado correctamente.', textAlign: TextAlign.center),
+            const SizedBox(height: 24),
+            const Text('¿Deseas generar la etiqueta QR profesional ahora?', 
+              style: TextStyle(fontWeight: FontWeight.w600),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.spaceEvenly,
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context); // Cierra diálogo
+              Navigator.pop(context); // Vuelve atrás
+            },
+            child: Text('MÁS TARDE', style: TextStyle(color: Colors.grey[600])),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(context); // Cierra diálogo
+              Navigator.pushReplacement(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => QRPreviewScreen(extintor: extintor),
+                ),
+              );
+            },
+            icon: const Icon(Icons.qr_code_2),
+            label: const Text('VER QR'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override

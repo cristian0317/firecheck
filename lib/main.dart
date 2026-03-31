@@ -1,28 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'firebase_options.dart';
 import 'ui/screens/home_screen.dart';
 import 'ui/screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   try {
     await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: 'AIzaSyBwjwYP8mSXIZb-SU5Il4nA2G2rQ1WuFBM',
-        appId: '1:575046042727:web:d7732b64a35b6dc37bc0c2',
-        messagingSenderId: '575046042727',
-        projectId: 'firecheck-1ec4c',
-        authDomain: 'firecheck-1ec4c.firebaseapp.com',
-        storageBucket: 'firecheck-1ec4c.firebasestorage.app',
-        measurementId: 'G-DRC35F0ZF8',
-      ),
+      options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e) {
-    debugPrint('Error inicializando Firebase: $e');
+    debugPrint("Firebase initialization failed: $e");
   }
-
   runApp(const FirecheckApp());
 }
 
@@ -42,23 +33,32 @@ class FirecheckApp extends StatelessWidget {
           elevation: 0,
         ),
       ),
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
+      home: const AuthWrapper(),
+    );
+  }
+}
 
-          if (snapshot.hasData) {
-            return const HomeScreen();
-          }
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
 
-          // Si no hay sesión iniciada, mostrar LoginScreen
-          return const LoginScreen();
-        },
-      ),
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Mientras carga el estado inicial
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        
+        // Si hay un usuario autenticado, vamos al Home
+        if (snapshot.hasData) {
+          return const HomeScreen();
+        }
+        
+        // Si no hay usuario, vamos al Login
+        return const LoginScreen();
+      },
     );
   }
 }

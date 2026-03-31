@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "575046042727",
+    "project_id": "firecheck-1ec4c",
+    "storage_bucket": "firecheck-1ec4c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:575046042727:android:3a4f38bbb7e2e6317bc0c2",
+        "android_client_info": {
+          "package_name": "com.example.firecheck"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDtjwY7NHdPYk__P8oJ49bbzDYRtmIbWqY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

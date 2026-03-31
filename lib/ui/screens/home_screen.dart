@@ -2,12 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firecheck/models/extintor_model.dart';
 import '../../services/firestore_service.dart';
-import 'inspeccion_screen.dart';
+import 'nueva_inspeccion_screen.dart';
 import 'agregar_equipo_screen.dart';
 import 'historial_screen.dart';
+import 'qr_scanner_screen.dart';
+import 'login_screen.dart';
+import 'qr_preview_screen.dart'; // IMPORTANTE
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
+
+  Future<void> _logout(BuildContext context) async {
+    try {
+      await FirebaseAuth.instance.signOut();
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error al cerrar sesión: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +40,7 @@ class HomeScreen extends StatelessWidget {
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.history),
-          tooltip: 'Historial',
+          tooltip: 'Historial Global',
           onPressed: () {
             Navigator.push(
               context,
@@ -31,17 +52,7 @@ class HomeScreen extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Cerrar Sesión',
-            onPressed: () async {
-              try {
-                await FirebaseAuth.instance.signOut();
-              } catch (e) {
-                if (context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error al cerrar sesión: $e')),
-                  );
-                }
-              }
-            },
+            onPressed: () => _logout(context),
           ),
         ],
       ),
@@ -49,7 +60,6 @@ class HomeScreen extends StatelessWidget {
         stream: firestoreService.getExtintoresStream(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            // Manejo específico de errores de permisos o sesión expirada
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(24.0),
@@ -63,21 +73,20 @@ class HomeScreen extends StatelessWidget {
                       style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'No tienes permisos para ver estos datos o tu sesión ha caducado. Por favor, cierra sesión e intenta de nuevo.',
+                    Text(
+                      'No tienes permisos para ver esta lista o tu sesión ha expirado.\nDetalle técnico: ${snapshot.error}',
                       textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey),
+                      style: const TextStyle(color: Colors.grey, fontSize: 13),
                     ),
                     const SizedBox(height: 24),
                     ElevatedButton.icon(
-                      onPressed: () async {
-                        await FirebaseAuth.instance.signOut();
-                      },
-                      icon: const Icon(Icons.logout),
-                      label: const Text('Cerrar Sesión'),
+                      onPressed: () => _logout(context),
+                      icon: const Icon(Icons.login),
+                      label: const Text('Volver al Login y Reintentar'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Theme.of(context).colorScheme.errorContainer,
-                        foregroundColor: Theme.of(context).colorScheme.onErrorContainer,
+                        backgroundColor: Colors.red,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                       ),
                     ),
                   ],
@@ -93,13 +102,13 @@ class HomeScreen extends StatelessWidget {
           final extintores = snapshot.data ?? [];
 
           if (extintores.isEmpty) {
-            return Center(
+            return const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.inventory_2_outlined, size: 64, color: Colors.grey[400]),
-                  const SizedBox(height: 16),
-                  const Text('No hay extintores registrados en la base de datos.'),
+                  Icon(Icons.inventory_2_outlined, size: 48, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No hay extintores registrados.'),
                 ],
               ),
             );
@@ -125,16 +134,46 @@ class HomeScreen extends StatelessWidget {
                       color: Theme.of(context).colorScheme.primary),
                   ),
                   title: Text(
-                    'ID: ${extintor.id}',
+                    '${extintor.tipo} - ${extintor.ubicacion}',
                     style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
-                  subtitle: Text(extintor.ubicacion),
-                  trailing: const Icon(Icons.arrow_forward_ios, size: 14),
+                  subtitle: Text('ID: ${extintor.id}'),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // AHORA NAVEGA A LA PREVISUALIZACIÓN
+                      IconButton(
+                        icon: const Icon(Icons.qr_code, size: 24, color: Colors.blue),
+                        tooltip: 'Ver Etiqueta QR',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => QRPreviewScreen(extintor: extintor),
+                            ),
+                          );
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.history_edu, size: 20),
+                        tooltip: 'Ver historial',
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => HistorialScreen(equipoId: extintor.id),
+                            ),
+                          );
+                        },
+                      ),
+                      const Icon(Icons.arrow_forward_ios, size: 14),
+                    ],
+                  ),
                   onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => InspeccionScreen(extintor: extintor),
+                        builder: (context) => NuevaInspeccionScreen(extintor: extintor),
                       ),
                     );
                   },
@@ -144,15 +183,33 @@ class HomeScreen extends StatelessWidget {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AgregarEquipoScreen()),
-          );
-        },
-        label: const Text('Registrar'),
-        icon: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'qr_scanner_fab',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const QRScannerScreen()),
+              );
+            },
+            tooltip: 'Escanear QR',
+            child: const Icon(Icons.qr_code_scanner),
+          ),
+          const SizedBox(height: 12),
+          FloatingActionButton.extended(
+            heroTag: 'add_equipo_fab',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const AgregarEquipoScreen()),
+              );
+            },
+            label: const Text('Registrar Equipo'),
+            icon: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }

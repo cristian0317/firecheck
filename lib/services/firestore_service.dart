@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/extintor_model.dart';
+import '../models/inspeccion_model.dart';
 
 class FirestoreService {
   final FirebaseFirestore _db = FirebaseFirestore.instance;
@@ -14,28 +15,39 @@ class FirestoreService {
   }
 
   // Obtener historial de inspecciones (todas o por extintor)
-  Stream<QuerySnapshot> getInspeccionesStream({String? extintorId}) {
-    Query query = _db.collection('inspecciones').orderBy('timestamp', descending: true);
+  Stream<List<Inspeccion>> getInspeccionesStream({String? equipoId}) {
+    Query query = _db.collection('inspecciones').orderBy('fecha', descending: true);
     
-    if (extintorId != null) {
-      query = query.where('extintor_id', isEqualTo: extintorId);
+    if (equipoId != null) {
+      query = query.where('equipoId', isEqualTo: equipoId);
     }
     
-    return query.snapshots();
+    return query.snapshots().map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return Inspeccion.fromMap(doc.id, doc.data() as Map<String, dynamic>);
+      }).toList();
+    });
   }
 
-  Future<void> guardarInspeccion({
-    required String extintorId,
-    required bool presionCorrecta,
-    required bool selloIntacto,
-    required String observaciones,
-  }) async {
-    await _db.collection('inspecciones').add({
-      'extintor_id': extintorId,
-      'presion_correcta': presionCorrecta,
-      'sello_intacto': selloIntacto,
-      'observaciones': observaciones,
-      'timestamp': FieldValue.serverTimestamp(),
-    });
+  // Guardar una nueva inspección
+  Future<void> guardarInspeccion(Inspeccion inspeccion) async {
+    try {
+      await _db.collection('inspecciones').add(inspeccion.toMap());
+    } catch (e) {
+      throw Exception('Error al guardar la inspección: $e');
+    }
+  }
+
+  // Buscar extintor por ID
+  Future<Extintor?> getExtintorById(String id) async {
+    try {
+      final doc = await _db.collection('extintores').doc(id).get();
+      if (doc.exists) {
+        return Extintor.fromMap(doc.id, doc.data()!);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Error al buscar extintor: $e');
+    }
   }
 }

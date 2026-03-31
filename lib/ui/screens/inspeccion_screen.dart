@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/extintor_model.dart';
+import '../../models/inspeccion_model.dart';
 import '../../services/firestore_service.dart';
 
 class InspeccionScreen extends StatefulWidget {
@@ -22,12 +24,20 @@ class _InspeccionScreenState extends State<InspeccionScreen> {
     setState(() => _isSaving = true);
 
     try {
-      await _firestoreService.guardarInspeccion(
-        extintorId: widget.extintor.id,
-        presionCorrecta: _presionCorrecta,
-        selloIntacto: _selloIntacto,
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) throw Exception('Usuario no autenticado');
+
+      final nuevaInspeccion = Inspeccion(
+        equipoId: widget.extintor.id,
+        usuarioId: user.uid,
+        fecha: DateTime.now(),
+        presion: _presionCorrecta,
+        valvula: _selloIntacto,
+        estadoGeneral: (_presionCorrecta && _selloIntacto) ? 'Bueno' : 'Requiere Mantenimiento',
         observaciones: _observacionesController.text.trim(),
       );
+
+      await _firestoreService.guardarInspeccion(nuevaInspeccion);
 
       if (mounted) {
         Navigator.pop(context);
